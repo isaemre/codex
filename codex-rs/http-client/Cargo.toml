@@ -6,6 +6,8 @@ version.workspace = true
 
 [dependencies]
 bytes = { workspace = true }
+# MAKAS: destination lock hook in the network policy (K-27).
+codex-makas-config = { workspace = true }
 codex-utils-rustls-provider = { workspace = true }
 futures = { workspace = true }
 http = { workspace = true }

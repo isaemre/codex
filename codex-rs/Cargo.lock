@@ -2979,6 +2979,7 @@ dependencies = [
  "codex-image-generation-extension",
  "codex-install-context",
  "codex-login",
+ "codex-makas-lock",
  "codex-mcp",
  "codex-mcp-extension",
  "codex-memories-read",
@@ -3820,6 +3821,7 @@ name = "codex-http-client"
 version = "0.167.0"
 dependencies = [
  "bytes",
+ "codex-makas-config",
  "codex-utils-cargo-bin",
  "codex-utils-rustls-provider",
  "curl",
@@ -4000,6 +4002,33 @@ dependencies = [
  "webbrowser",
  "windows-sys 0.61.2",
  "wiremock",
+]
+
+[[package]]
+name = "codex-makas-config"
+version = "0.167.0"
+dependencies = [
+ "pretty_assertions",
+ "url",
+]
+
+[[package]]
+name = "codex-makas-lock"
+version = "0.167.0"
+dependencies = [
+ "codex-config",
+ "codex-core",
+ "codex-http-client",
+ "codex-makas-config",
+ "codex-model-provider-info",
+ "codex-websocket-client",
+ "http 1.4.0",
+ "pretty_assertions",
+ "tempfile",
+ "tokio",
+ "tokio-tungstenite",
+ "toml 0.9.11+spec-1.1.0",
+ "url",
 ]
 
 [[package]]

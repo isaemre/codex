@@ -1,0 +1,23 @@
+[package]
+edition.workspace = true
+license.workspace = true
+name = "codex-makas-config"
+version.workspace = true
+build = "build.rs"
+
+[lib]
+doctest = false
+name = "codex_makas_config"
+path = "src/lib.rs"
+
+[lints]
+workspace = true
+
+[dependencies]
+url = { workspace = true }
+
+[build-dependencies]
+url = { workspace = true }
+
+[dev-dependencies]
+pretty_assertions = { workspace = true }
