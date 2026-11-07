@@ -100,3 +100,4 @@ __pycache__/
 *.pyc
 # MAKAS: local Electron/app-server notes; to be removed later.
 devdocs/*.md
+codex-rs/Cargo.lock
