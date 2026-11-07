@@ -4,17 +4,19 @@ Vizyon: `makas/docs/VISION.md`. Kararlar: `makas/docs/KARARLAR.md`. Kararlar ça
 
 ## Temel kurallar
 - Kendi Rust kodumuzu codex-rs/makas/ altına, diğer her şeyi (doküman, Electron) makas/ altına yaz.
-- Upstream dosyalarında değişikliği minimumda tut ve değiştirdiğin yerin üstüne `// MAKAS: neden (K-xx)` yaz.
+- Upstream dosyalarında değişikliği minimumda tut ve değiştirdiğin yerin üstüne `// MAKAS: neden (K-xx)` yaz (TOML'da `# MAKAS: neden (K-xx)`).
 - Upstream kodunu silme; bir özelliği kapatman gerekiyorsa tek noktadan kapat.
 - Önce config ile çözülüp çözülemeyeceğine bak.
 - Kod Linux, macOS ve Windows'ta çalışmalı.
 - Model bağlantısı sadece şirket içi LLM'e gitmeli. LLM adresi sadece `codex-makas-config`'teki derleme sabitinden gelir; yeni sağlayıcı, URL ya da dış ağ çağrısı ekleme.
 - Upstream dosyasına dokunan işlerde önce plan çıkar ve onayımı al.
+- Dokümanlarda bariz bir hata ya da istekle çelişki görürsen kısaca uyar veya değişiklik öner. Küçük tercihleri sorma.
 
 ## Upstream'in çalışma şekli
 - Bir klasörde AGENTS.md varsa önce onu oku.
 - Değişiklikten sonra codex-rs içinde `just fmt` çalıştır; testler için `just test -p <crate>` kullan. Komutların var olduğunu justfile'dan doğrula.
+- Upstream crate'lerinin testlerini `makas/scripts/test-upstream.sh -p <crate>` ile çalıştır; bu testler kilitli derlemede kırılır (K-28).
 - codex-core'a kod ekleme; yeni kodu kendi crate'inde yaz, core'da sadece tek satırlık kanca bırak (K-17).
 
 ## Dil
-- Kod, yorum ve commit İngilizce, dokümanlar Türkçe. Push etme.
+- Kod ve yorum İngilizce; commit mesajları ve dokümanlar Türkçe. Push etme.
