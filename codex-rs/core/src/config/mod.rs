@@ -4051,6 +4051,9 @@ impl Config {
             .or(model_provider)
             .or(cfg.model_provider)
             .unwrap_or_else(|| "openai".to_string());
+        // MAKAS: whatever was configured, only the compiled-in provider exists (K-27).
+        let (model_providers, model_provider_id) =
+            codex_makas_lock::apply(model_providers, model_provider_id);
         let model_provider = model_providers
             .get(&model_provider_id)
             .ok_or_else(|| {

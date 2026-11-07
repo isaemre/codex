@@ -279,6 +279,10 @@ impl NetworkPolicy {
 
     /// Checks a destination before proxy resolution, DNS, or transport work starts.
     pub fn acquire(&self, url: &Url) -> Result<NetworkPermit, NetworkPolicyDenied> {
+        // MAKAS: deny everything but the compiled-in LLM address, managed or not (K-27).
+        if !codex_makas_config::is_destination_allowed(url) {
+            return Err(NetworkPolicyDenied::Destination);
+        }
         if self
             .endpoints
             .as_ref()
@@ -292,6 +296,10 @@ impl NetworkPolicy {
     /// Disables SDKs without destination enforcement whenever restrictions apply.
     /// The returned permit also cancels work if an unrestricted policy changes.
     pub fn acquire_for_unsupported_sdk(&self) -> Result<NetworkPermit, NetworkPolicyDenied> {
+        // MAKAS: these SDKs pick their own destination, so a locked build disables them (K-27).
+        if codex_makas_config::LOCKED {
+            return Err(NetworkPolicyDenied::UnsupportedTransport);
+        }
         if self.endpoints.is_some() {
             return Err(NetworkPolicyDenied::UnsupportedTransport);
         }

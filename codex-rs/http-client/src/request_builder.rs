@@ -182,7 +182,10 @@ impl RequestBuilder {
         match self.backend {
             HttpClientBackend::Routed(pool) => pool.send(self.request?).await,
             HttpClientBackend::Direct(client) => {
-                Ok(client.execute(self.request?.build(&client)?).await?.into())
+                let request = self.request?;
+                // MAKAS: direct clients skip the policy, so check the destination here (K-27).
+                crate::NetworkPolicy::unmanaged().acquire(request.request.url())?;
+                Ok(client.execute(request.build(&client)?).await?.into())
             }
         }
     }

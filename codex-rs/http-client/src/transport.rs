@@ -100,6 +100,8 @@ impl ReqwestTransport {
                     .await
                     .map_err(Self::map_route_aware_error),
                 HttpClientBackend::Direct(client) => {
+                    // MAKAS: direct clients skip the policy, so check the destination here (K-27).
+                    crate::NetworkPolicy::unmanaged().acquire(request.request.url())?;
                     let request = request
                         .build(client)
                         .map_err(|error| Self::map_error(error.into()))?;

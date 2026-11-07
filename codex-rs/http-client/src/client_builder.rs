@@ -401,7 +401,8 @@ impl HttpClientBuilder {
         if let Some(identity) = self.tls.client_identity {
             builder = builder.identity(identity.reqwest).https_only(true);
         }
-        if !self.follow_redirects {
+        // MAKAS: a redirect must not carry a request past the destination check (K-27).
+        if !self.follow_redirects || codex_makas_config::LOCKED {
             builder = builder.redirect(reqwest::redirect::Policy::none());
         } else if let Some(redirect_observed) = self.redirect_observed {
             builder = builder.redirect(reqwest::redirect::Policy::custom(move |attempt| {
