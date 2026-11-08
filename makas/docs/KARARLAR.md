@@ -53,3 +53,10 @@ Bir karar değişirse eskisi silinmez; altına "K-xx ile değiştirildi" notu d�
 - **K-29 · Commit dili Türkçe.** Kod ve yorumlar İngilizce kalır; commit mesajları ve dokümanlar Türkçe yazılır.
   - *Neden:* Proje sahibinin isteği: commit mesajları Türkçe olsun. Kod ve yorumlar İngilizce kalır.
   - *Değiştirdiği karar:* K-13'ün commit kısmı.
+
+## Giriş akışı
+- **K-30 · Giriş akışı: API key ve model.** Makas'ta ilk ekran gateway API key'idir; ChatGPT ve Device Code seçenekleri gösterilmez. Key girilince gateway'den model listesi çekilir, kullanıcı modelini seçer ve `config.toml`'a `model` yazılır. Key ya da model yoksa onboarding açılır. Trust adımı bu akışın dışında kalır.
+  - *Neden:* ChatGPT girişi kilitli derlemede zaten engelli (K-27); ekranın varsayılan seçimi kullanıcıyı çalışmayan bir yola götürüyordu. Makas sağlayıcısında model listesi çekilmediği için (`api_key_discovery_disabled`) model seçilmezse OpenAI'nin gömülü listesinden bir model seçilirdi.
+  - *Nasıl:* Yalnızca kilitli derlemede çalışır (`codex_makas_config::LOCKED`); kilit kapalı upstream testleri aynı kalır. Key doğrulaması ve model listesi `codex-makas-models` üzerinden, yalnızca `llm_base_url()` adresine, `codex-http-client` ile gider (K-27). Gateway anahtarı reddederse ya da ulaşılamazsa key adımı açık kalır. Liste okunamazsa model serbest metinle girilir. Key mevcut API key akışıyla `auth.json`'a yazılır (K-21).
+  - *Sınır:* Model-only kurtarma yolunda (key kayıtlı, model yok) TUI anahtarı okumaz; liste yerine serbest metin istenir. Anahtar app-server sınırında kalır.
+  - *Not:* Gateway'in `/models` yanıtının OpenAI biçiminde (`data[].id`) olduğu varsayılır (K-22, vLLM). Gerçek gateway ile elle doğrulanmalı.
