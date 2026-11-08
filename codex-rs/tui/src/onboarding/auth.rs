@@ -42,6 +42,7 @@ use ratatui::widgets::Wrap;
 use codex_protocol::config_types::ForcedLoginMethod;
 use std::cell::Cell;
 use std::sync::Arc;
+use std::sync::PoisonError;
 use std::sync::RwLock;
 use std::time::Instant;
 use uuid::Uuid;
@@ -290,6 +291,8 @@ pub(crate) struct AuthModeWidget {
     pub gcp_setup_enabled: bool,
     pub animations_enabled: bool,
     pub animations_suppressed: Cell<bool>,
+    // MAKAS: checks the gateway key and lists its models before saving; locked builds only (K-30).
+    pub(super) makas: Option<super::makas_model::GatewayKeyCheck>,
 }
 
 impl AuthModeWidget {
@@ -776,10 +779,16 @@ impl AuthModeWidget {
     }
 
     fn render_api_key_configured(&self, area: Rect, buf: &mut Buffer) {
+        // MAKAS: the locked build's next step is the model choice, not billing (K-30).
+        let note = if codex_makas_config::LOCKED {
+            "  Choose a model to finish setup."
+        } else {
+            "  Codex will use usage-based billing with your API key."
+        };
         let lines = vec![
             "✓ API key configured".fg(Color::Green).into(),
             "".into(),
-            "  Codex will use usage-based billing with your API key.".into(),
+            note.into(),
         ];
 
         Paragraph::new(lines)
@@ -798,7 +807,8 @@ impl AuthModeWidget {
         let mut intro_lines: Vec<Line> = vec![
             Line::from(vec![
                 "> ".into(),
-                "Use your own OpenAI API key for usage-based billing".bold(),
+                // MAKAS: locked builds name the gateway key, not an OpenAI billing key (K-30).
+                super::makas_model::api_key_intro().bold(),
             ]),
             "".into(),
             "  Paste or type your API key below.".into(),
@@ -833,18 +843,19 @@ impl AuthModeWidget {
             )
             .render(input_area, buf);
 
-        let mut footer_lines: Vec<Line> = vec![
-            Line::from(vec![
-                "  Press ".dim(),
-                self.confirm_binding().into(),
-                " to save".dim(),
-            ]),
-            Line::from(vec![
+        let mut footer_lines: Vec<Line> = vec![Line::from(vec![
+            "  Press ".dim(),
+            self.confirm_binding().into(),
+            " to save".dim(),
+        ])];
+        // MAKAS: Esc has nowhere to go in the locked build, so the hint is not shown (K-30).
+        if !codex_makas_config::LOCKED {
+            footer_lines.push(Line::from(vec![
                 "  Press ".dim(),
                 self.cancel_binding().into(),
                 " to go back".dim(),
-            ]),
-        ];
+            ]));
+        }
         if let Some(error) = self.error_message() {
             footer_lines.push("".into());
             footer_lines.push(error.red().into());
@@ -861,9 +872,12 @@ impl AuthModeWidget {
         {
             let mut guard = self.sign_in_state.write().unwrap();
             if let SignInState::ApiKeyEntry(state) = &mut *guard {
+                // MAKAS: the locked build has no sign-in picker to return to, so Esc does nothing (K-30).
                 if keys::CANCEL.is_pressed(*key_event) {
-                    *guard = SignInState::PickMode;
-                    self.set_error(/*message*/ None);
+                    if !codex_makas_config::LOCKED {
+                        *guard = SignInState::PickMode;
+                        self.set_error(/*message*/ None);
+                    }
                     should_request_frame = true;
                 } else if key_event.kind == KeyEventKind::Press
                     && keys::CONFIRM.is_pressed(*key_event)
@@ -982,7 +996,31 @@ impl AuthModeWidget {
         let sign_in_state = self.sign_in_state.clone();
         let error = self.error.clone();
         let request_frame = self.request_frame.clone();
+        let makas = self.makas.clone();
         tokio::spawn(async move {
+            // MAKAS: check the key with the gateway before saving it. A rejected or unreachable
+            // gateway keeps the key step open. An unreadable model list falls back to a typed name (K-30).
+            if let Some(check) = makas {
+                match codex_makas_models::fetch_model_ids(check.factory, &api_key).await {
+                    Ok(ids) => {
+                        *check.models.write().unwrap_or_else(PoisonError::into_inner) = Some(ids);
+                    }
+                    Err(codex_makas_models::ModelsError::BadResponse) => {
+                        *check.models.write().unwrap_or_else(PoisonError::into_inner) = None;
+                    }
+                    Err(err) => {
+                        *error.write().unwrap() =
+                            Some(super::makas_model::gateway_error_message(&err));
+                        *sign_in_state.write().unwrap() =
+                            SignInState::ApiKeyEntry(ApiKeyInputState {
+                                value: api_key,
+                                prepopulated_from_env: false,
+                            });
+                        request_frame.schedule_frame();
+                        return;
+                    }
+                }
+            }
             match request_handle
                 .request_typed::<LoginAccountResponse>(ClientRequest::LoginAccount {
                     request_id: onboarding_request_id(),
@@ -1386,6 +1424,7 @@ mod tests {
             gcp_setup_enabled: false,
             animations_enabled: true,
             animations_suppressed: std::cell::Cell::new(false),
+            makas: None,
         };
         (widget, codex_home)
     }
@@ -1409,7 +1448,14 @@ mod tests {
                 .draw(|frame| widget.render_ref(area, frame.buffer_mut()))
                 .expect("draw");
 
-            insta::assert_snapshot!(name, terminal.backend().to_string());
+            // MAKAS: the locked copy differs from upstream, so it has its own snapshots.
+            insta::assert_snapshot!(
+                format!(
+                    "{}{name}",
+                    crate::onboarding::makas_model::snapshot_prefix()
+                ),
+                terminal.backend().to_string()
+            );
         }
     }
 

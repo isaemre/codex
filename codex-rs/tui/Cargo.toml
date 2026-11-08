@@ -47,6 +47,9 @@ codex-feedback = { workspace = true }
 codex-file-search = { workspace = true }
 codex-git-utils = { workspace = true }
 codex-http-client = { workspace = true }
+# MAKAS: locked gateway settings and model listing for the onboarding key/model steps (K-30).
+codex-makas-config = { workspace = true }
+codex-makas-models = { workspace = true }
 codex-login = { workspace = true }
 codex-mermaid = { workspace = true }
 codex-message-history = { workspace = true }

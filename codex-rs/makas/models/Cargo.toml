@@ -1,0 +1,22 @@
+[package]
+edition.workspace = true
+license.workspace = true
+name = "codex-makas-models"
+version.workspace = true
+
+[lib]
+doctest = false
+name = "codex_makas_models"
+path = "src/lib.rs"
+
+[lints]
+workspace = true
+
+[dependencies]
+codex-http-client = { workspace = true }
+codex-makas-config = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+pretty_assertions = { workspace = true }

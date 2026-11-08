@@ -97,6 +97,7 @@ members = [
     # MAKAS: own crates live under makas/ (K-04).
     "makas/config",
     "makas/lock",
+    "makas/models",
     "mxc-sandbox",
     "models-manager",
     "network-proxy",
@@ -276,6 +277,7 @@ codex-model-provider-info = { path = "model-provider-info" }
 # MAKAS: own crates live under makas/ (K-04).
 codex-makas-config = { path = "makas/config" }
 codex-makas-lock = { path = "makas/lock" }
+codex-makas-models = { path = "makas/models" }
 codex-models-manager = { path = "models-manager" }
 codex-mxc-sandbox = { path = "mxc-sandbox" }
 codex-network-proxy = { path = "network-proxy" }

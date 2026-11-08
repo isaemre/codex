@@ -4032,6 +4032,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "codex-makas-models"
+version = "0.167.0"
+dependencies = [
+ "codex-http-client",
+ "codex-makas-config",
+ "pretty_assertions",
+ "serde_json",
+ "thiserror 2.0.18",
+]
+
+[[package]]
 name = "codex-mcp"
 version = "0.167.0"
 dependencies = [
@@ -5105,6 +5116,8 @@ dependencies = [
  "codex-http-client",
  "codex-install-context",
  "codex-login",
+ "codex-makas-config",
+ "codex-makas-models",
  "codex-mcp",
  "codex-mermaid",
  "codex-message-history",

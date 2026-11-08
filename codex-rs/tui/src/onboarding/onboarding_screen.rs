@@ -47,6 +47,9 @@ use crate::onboarding::auth::SignInOption;
 use crate::onboarding::auth::SignInState;
 use crate::onboarding::bedrock::BedrockState;
 use crate::onboarding::keys;
+// MAKAS: gateway key check and model step, locked builds only (K-30).
+use crate::onboarding::makas_model;
+use crate::onboarding::makas_model::ModelSelectWidget;
 use crate::onboarding::trust_directory::TrustDirectorySelection;
 use crate::onboarding::trust_directory::TrustDirectoryWidget;
 use crate::onboarding::welcome::WelcomeWidget;
@@ -70,6 +73,8 @@ pub(crate) use directory_trust::check_directory_trust;
 enum Step {
     Welcome(WelcomeWidget),
     Auth(AuthModeWidget),
+    // MAKAS: model choice after the gateway key, locked builds only (K-30).
+    MakasModel(ModelSelectWidget),
     TrustDirectory(TrustDirectoryWidget),
     GovCloudGuidance {
         state: BedrockState,
@@ -117,6 +122,8 @@ pub(crate) struct OnboardingScreenArgs {
 pub(crate) struct OnboardingResult {
     pub directory_trust_persisted: bool,
     pub should_exit: bool,
+    // MAKAS: a model was saved in this run, so config must be reloaded (K-30).
+    pub model_persisted: bool,
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
@@ -146,6 +153,9 @@ impl OnboardingScreen {
             .as_ref()
             .map(|project| project.trust_target.to_string_lossy().into_owned());
         let auth_config = config.auth_config();
+        // MAKAS: the key step and the model step share the gateway's model list (K-30).
+        let makas_models = makas_model::new_gateway_models();
+        let makas_model_request_handle = app_server_request_handle.clone();
         let mut steps: Vec<Step> = Vec::new();
         steps.push(Step::Welcome(WelcomeWidget::new(
             !matches!(login_status, LoginStatus::NotAuthenticated),
@@ -181,7 +191,8 @@ impl OnboardingScreen {
                     highlighted_mode,
                     activation_key_guard: None,
                     error: Arc::new(RwLock::new(None)),
-                    sign_in_state: Arc::new(RwLock::new(SignInState::PickMode)),
+                    // MAKAS: locked builds start at the gateway key entry (K-30).
+                    sign_in_state: Arc::new(RwLock::new(makas_model::initial_sign_in_state())),
                     login_status,
                     app_server_target,
                     app_server_request_handle,
@@ -191,10 +202,25 @@ impl OnboardingScreen {
                     animations_enabled: local_settings.tui.animations
                         && local_settings.tui.effects.shimmer,
                     animations_suppressed: std::cell::Cell::new(false),
+                    // MAKAS: checks the key against the gateway before it is saved (K-30).
+                    makas: codex_makas_config::LOCKED.then(|| makas_model::GatewayKeyCheck {
+                        factory: config.http_client_factory(),
+                        models: makas_models.clone(),
+                    }),
                 }));
             } else {
                 tracing::warn!("skipping onboarding login step without app-server request handle");
             }
+        }
+        // MAKAS: after the key step, or alone when a locked config still names no model (K-30).
+        if makas_model::model_step_needed(config.model.as_deref())
+            && makas_model_request_handle.is_some()
+        {
+            steps.push(Step::MakasModel(ModelSelectWidget::new(
+                tui.frame_requester(),
+                makas_model_request_handle,
+                makas_models.clone(),
+            )));
         }
         let highlighted = TrustDirectorySelection::Trust;
         if show_trust_screen {
@@ -268,7 +294,10 @@ impl OnboardingScreen {
         // material so terminal selection is not interrupted by redraws.
         self.current_steps().into_iter().any(|step| match step {
             Step::Auth(widget) => widget.should_suppress_animations(),
-            Step::Welcome(_) | Step::TrustDirectory(_) | Step::GovCloudGuidance { .. } => false,
+            Step::Welcome(_)
+            | Step::MakasModel(_)
+            | Step::TrustDirectory(_)
+            | Step::GovCloudGuidance { .. } => false,
         })
     }
 
@@ -309,7 +338,10 @@ impl OnboardingScreen {
     fn auth_widget_mut(&mut self) -> Option<&mut AuthModeWidget> {
         self.steps.iter_mut().find_map(|step| match step {
             Step::Auth(widget) => Some(widget),
-            Step::Welcome(_) | Step::TrustDirectory(_) | Step::GovCloudGuidance { .. } => None,
+            Step::Welcome(_)
+            | Step::MakasModel(_)
+            | Step::TrustDirectory(_)
+            | Step::GovCloudGuidance { .. } => None,
         })
     }
 
@@ -329,7 +361,32 @@ impl OnboardingScreen {
         }
     }
 
+    /// Whether the Makas model step is still waiting for a model.
+    fn makas_model_pending(&self) -> bool {
+        self.steps.iter().any(|step| {
+            matches!(step, Step::MakasModel(_))
+                && matches!(step.get_step_state(), StepState::InProgress)
+        })
+    }
+
+    /// Whether the Makas model step saved a model during this run.
+    fn makas_model_saved(&self) -> bool {
+        self.steps.iter().any(|step| {
+            matches!(step, Step::MakasModel(_))
+                && matches!(step.get_step_state(), StepState::Complete)
+        })
+    }
+
     fn text_entry_context(&self) -> TextEntryContext {
+        // MAKAS: a typed model name takes printable keys, including the quit letter (K-30).
+        if let Some(Step::MakasModel(widget)) = self.current_steps().last().copied()
+            && let Some(has_text) = widget.manual_text_entry()
+        {
+            return TextEntryContext {
+                active: true,
+                has_text,
+            };
+        }
         self.steps
             .iter()
             .find_map(|step| {
@@ -370,6 +427,8 @@ impl KeyboardHandler for OnboardingScreen {
                 // leave the user at a prompt in an unauthed state.
                 self.should_exit = true;
             } else if self.is_trust_step_active()
+                // MAKAS: quitting before a model is chosen ends the run (K-30).
+                || self.makas_model_pending()
                 || self
                     .steps
                     .iter()
@@ -442,7 +501,7 @@ impl WidgetRef for &OnboardingScreen {
             match step {
                 Step::Welcome(widget) => widget.set_presentation(logo_presentation),
                 Step::Auth(widget) => widget.set_animations_suppressed(suppress_animations),
-                Step::TrustDirectory(_) | Step::GovCloudGuidance { .. } => {}
+                Step::MakasModel(_) | Step::TrustDirectory(_) | Step::GovCloudGuidance { .. } => {}
             }
         }
 
@@ -516,6 +575,7 @@ impl KeyboardHandler for Step {
             Step::Welcome(widget) => widget.handle_key_event(key_event),
             Step::Auth(widget) => widget.handle_key_event(key_event),
             Step::TrustDirectory(widget) => widget.handle_key_event(key_event),
+            Step::MakasModel(widget) => widget.handle_key_event(key_event),
             Step::GovCloudGuidance {
                 state,
                 acknowledged,
@@ -529,6 +589,7 @@ impl KeyboardHandler for Step {
         match self {
             Step::Welcome(_) | Step::GovCloudGuidance { .. } => {}
             Step::Auth(widget) => widget.handle_paste(pasted),
+            Step::MakasModel(widget) => widget.handle_paste(pasted),
             Step::TrustDirectory(widget) => widget.handle_paste(pasted),
         }
     }
@@ -539,6 +600,7 @@ impl StepStateProvider for Step {
         match self {
             Step::Welcome(w) => w.get_step_state(),
             Step::Auth(w) => w.get_step_state(),
+            Step::MakasModel(w) => w.get_step_state(),
             Step::TrustDirectory(w) => w.get_step_state(),
             Step::GovCloudGuidance { acknowledged, .. } => {
                 if *acknowledged {
@@ -558,6 +620,9 @@ impl WidgetRef for Step {
                 widget.render_ref(area, buf);
             }
             Step::Auth(widget) => {
+                widget.render_ref(area, buf);
+            }
+            Step::MakasModel(widget) => {
                 widget.render_ref(area, buf);
             }
             Step::TrustDirectory(widget) => {
@@ -800,6 +865,7 @@ async fn run_onboarding_screen_inner(
     Ok(OnboardingResult {
         directory_trust_persisted,
         should_exit: onboarding_screen.should_exit(),
+        model_persisted: onboarding_screen.makas_model_saved(),
     })
 }
 

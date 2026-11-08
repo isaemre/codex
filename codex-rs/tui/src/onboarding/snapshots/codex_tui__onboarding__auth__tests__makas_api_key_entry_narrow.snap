@@ -1,0 +1,14 @@
+---
+source: tui/src/onboarding/auth.rs
+expression: terminal.backend().to_string()
+---
+> Enter the API key issued for Makas
+
+  Paste or type your API key below.
+
+
+
+╭API key───────────────────────────────╮
+│Paste or type your API key            │
+╰──────────────────────────────────────╯
+  Press enter to save

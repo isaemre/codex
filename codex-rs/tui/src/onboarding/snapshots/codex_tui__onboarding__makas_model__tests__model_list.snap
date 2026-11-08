@@ -1,0 +1,12 @@
+---
+source: tui/src/onboarding/makas_model.rs
+expression: "render_to_snapshot(&widget, 60, 12)"
+---
+
+  Choose the model
+
+› 1. qwen2.5-coder-32b                                      
+  2. gpt-oss-120b
+
+
+  ↑/↓ choose · enter save

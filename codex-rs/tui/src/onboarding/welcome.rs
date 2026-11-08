@@ -123,11 +123,12 @@ impl WidgetRef for &WelcomeWidget {
             0
         };
         let mut lines: Vec<Line> = vec![Line::default(); usize::from(logo_rows)];
+        // MAKAS: product name and tagline come from the locked build (K-14, K-30).
         lines.push(Line::from(vec![
             "  ".into(),
             "Welcome to ".into(),
-            "Codex".bold(),
-            ", OpenAI's command-line coding agent".into(),
+            super::makas_model::product_name().bold(),
+            super::makas_model::welcome_tagline().into(),
         ]));
 
         Paragraph::new(lines)
@@ -217,6 +218,13 @@ mod tests {
             })
             .collect::<Vec<_>>()
             .join("\n");
-        insta::assert_snapshot!(format!("welcome_logo_{width}x{height}"), visible.trim_end());
+        // MAKAS: locked and unlocked builds show different product names, so they keep separate snapshots.
+        insta::assert_snapshot!(
+            format!(
+                "{}welcome_logo_{width}x{height}",
+                crate::onboarding::makas_model::snapshot_prefix()
+            ),
+            visible.trim_end()
+        );
     }
 }

@@ -1,0 +1,10 @@
+---
+source: tui/src/onboarding/makas_model.rs
+expression: "render_to_snapshot(&widget, 60, 12)"
+---
+
+  Choose the model
+  The gateway did not list models. Type the model name.
+  > model name
+
+  enter save

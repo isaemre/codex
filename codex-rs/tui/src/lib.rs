@@ -1378,10 +1378,14 @@ async fn run_ratatui_app(
     let requires_openai_auth = startup_account
         .as_ref()
         .is_some_and(|account| account.requires_openai_auth);
+    // MAKAS: a locked config with no model still runs the model step, even after login (K-30).
+    let makas_model_missing =
+        codex_makas_config::LOCKED && initial_config.model.is_none() && app_server.is_some();
     let should_show_onboarding = should_show_onboarding(
         login_status,
         requires_openai_auth,
         should_show_trust_screen_flag,
+        makas_model_missing,
     );
 
     let mut config = if should_show_onboarding {
@@ -1469,7 +1473,10 @@ async fn run_ratatui_app(
                 // Reload config when persisted trust or auth changes alter the current process.
                 Ok::<_, std::io::Error>(
                     if !uses_remote_workspace
-                        && (onboarding_result.directory_trust_persisted || show_login_screen)
+                        && (onboarding_result.directory_trust_persisted
+                            || show_login_screen
+                            // MAKAS: a saved model must reach the running config (K-30).
+                            || onboarding_result.model_persisted)
                     {
                         load_config_or_exit_with_fallback_cwd(
                             cli_kv_overrides.clone(),
@@ -2466,8 +2473,13 @@ fn should_show_onboarding(
     login_status: LoginStatus,
     requires_openai_auth: bool,
     show_trust_screen: bool,
+    makas_model_missing: bool,
 ) -> bool {
     if show_trust_screen {
+        return true;
+    }
+    // MAKAS: the model step runs whenever a locked config names no model (K-30).
+    if makas_model_missing {
         return true;
     }
 
