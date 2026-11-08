@@ -16,4 +16,5 @@ trap 'rm -rf "${codex_home}"' EXIT
 export CODEX_HOME="${codex_home}"
 
 echo "start-dev: CODEX_HOME=${codex_home} (removed on exit)" >&2
-cargo run --bin codex -- "$@"
+# A cargo-built binary has no packaged install, so the background daemon cannot start (K-20).
+cargo run --bin codex -- --no-daemon "$@"
